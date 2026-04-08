@@ -14,4 +14,4 @@ if [ -f venv/bin/activate ]; then
     source venv/bin/activate
 fi
 
-exec python3 talkgreek.py "$@"
+exec python3 talkgreek.py "$@" 2> /dev/null

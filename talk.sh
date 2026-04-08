@@ -13,4 +13,4 @@ if [ -f venv/bin/activate ]; then
     source venv/bin/activate
 fi
 
-exec python3 talk.py "$@"
+exec python3 talk.py "$@" 1>/dev/null 2> /dev/null
