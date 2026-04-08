@@ -17,4 +17,4 @@ if [ -f venv/bin/activate ]; then
     source venv/bin/activate
 fi
 
-exec python3 snapshot.py "$1"
+exec python3 snapshot.py "$1" 1> /dev/null 2> /dev/null
