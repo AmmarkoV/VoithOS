@@ -50,23 +50,33 @@ def remainingTimeString(seconds):
         days = seconds // 86400
         return f"Remaining Time {days} days"
 
-# Replace with the actual server URL if different
-ip = "127.0.0.1"
-port = "8080"
+# Load defaults from configuration.json if present
+def _load_config():
+    cfg_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configuration.json")
+    if os.path.isfile(cfg_path):
+        try:
+            with open(cfg_path, encoding="utf-8") as _f:
+                return json.load(_f)
+        except Exception:
+            pass
+    return {}
 
-# Define the user prompt (caption)
-user_prompt = "Thoroughly and carefully describe this image."
+_cfg = _load_config()
+_vlm = _cfg.get("vlm", {})
+
+ip          = _vlm.get("ip",   "127.0.0.1")
+port        = str(_vlm.get("port", "8080"))
+user_prompt = _vlm.get("prompt", "Thoroughly and carefully describe this image.")
+temperature = _vlm.get("temperature", 0.6)
+top_p       = _vlm.get("top_p",       0.9)
+max_tokens  = _vlm.get("max_tokens",  100)
+greek       = bool(_vlm.get("greek",  False))
 
 files = []
 output_file = "output.json"
 
-# Hyperparameters
-temperature = 0.6
+# top_k is not in config (server-specific); keep local default
 top_k = 50
-top_p = 0.9
-max_tokens = 100
-
-greek = False
 startAt = 0
 
 argumentStart = 1

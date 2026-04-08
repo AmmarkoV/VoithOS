@@ -8,6 +8,7 @@
 #   • microphone.py           (Vosk STT)
 #   • greekTTS.py / webcam.py (Kokoro TTS)
 #   • Y-MAP-Net               (TensorFlow pose / segmentation / depth)
+#   • SharedMemoryVideoBuffers (camera bus: one producer, many consumers)
 #
 # Y-MAP-Net is cloned from GitHub if the directory is missing.
 # A symlink Y-MAP-Net/venv -> ../venv lets runYMAPNet.sh find the venv
@@ -30,7 +31,7 @@ echo "============================================================"
 
 # ── 1. System packages ────────────────────────────────────────────────────────
 echo ""
-echo "[ 1/6 ] Checking system packages …"
+echo "[ 1/7 ] Checking system packages …"
 
 SYSTEM_DEPS=(
     python3-venv
@@ -66,7 +67,7 @@ fi
 
 # ── 2. Python virtual environment ─────────────────────────────────────────────
 echo ""
-echo "[ 2/6 ] Setting up Python venv …"
+echo "[ 2/7 ] Setting up Python venv …"
 
 if [ ! -d venv ]; then
     echo "  Creating venv …"
@@ -79,7 +80,7 @@ echo "  Active Python: $(python3 --version)  $(which python3)"
 
 # ── 3. Python packages ────────────────────────────────────────────────────────
 echo ""
-echo "[ 3/6 ] Installing Python packages …"
+echo "[ 3/7 ] Installing Python packages …"
 
 # Upgrade pip/setuptools quietly
 pip install -q --upgrade pip setuptools wheel
@@ -123,7 +124,7 @@ echo "  Python packages installed."
 
 # ── 4. Vosk language models ───────────────────────────────────────────────────
 echo ""
-echo "[ 4/6 ] Checking Vosk language models …"
+echo "[ 4/7 ] Checking Vosk language models …"
 
 VOSK_CACHE="$HOME/.cache/vosk"
 mkdir -p "$VOSK_CACHE"
@@ -155,7 +156,7 @@ download_vosk_model \
 
 # ── 5. Argos translate language pack ─────────────────────────────────────────
 echo ""
-echo "[ 5/6 ] Setting up Argos translate (en ↔ el) …"
+echo "[ 5/7 ] Setting up Argos translate (en ↔ el) …"
 
 if argospm list 2>/dev/null | grep -q "translate-en_el"; then
     echo "  ✓ en→el pack already installed"
@@ -168,7 +169,7 @@ fi
 
 # ── 6. Y-MAP-Net ──────────────────────────────────────────────────────────────
 echo ""
-echo "[ 6/6 ] Setting up Y-MAP-Net …"
+echo "[ 6/7 ] Setting up Y-MAP-Net …"
 
 YMAPNET_DIR="$ROOT/Y-MAP-Net"
 
@@ -205,6 +206,52 @@ if [ ! -d "$YMAPNET_DIR/2d_pose_estimation" ]; then
     echo "  ✓ Model weights downloaded"
 else
     echo "  ✓ 2d_pose_estimation weights already present"
+fi
+
+# ── 7. SharedMemoryVideoBuffers ───────────────────────────────────────────────
+echo ""
+echo "[ 7/7 ] Setting up SharedMemoryVideoBuffers …"
+
+SHM_DIR="$ROOT/SharedMemoryVideoBuffers"
+
+if [ ! -f "$SHM_DIR/src/python/SharedMemoryManager.py" ]; then
+    echo "  Cloning SharedMemoryVideoBuffers …"
+    git clone https://github.com/AmmarkoV/SharedMemoryVideoBuffers "$SHM_DIR"
+else
+    echo "  ✓ SharedMemoryVideoBuffers already present"
+    git -C "$SHM_DIR" pull --ff-only || \
+        echo "  (pull skipped — local changes or detached HEAD)"
+fi
+
+# Build the shared library if not already built
+SHM_SO="$SHM_DIR/src/python/libSharedMemoryVideoBuffers.so"
+if [ ! -f "$SHM_SO" ]; then
+    echo "  Building libSharedMemoryVideoBuffers.so …"
+    make -C "$SHM_DIR"
+    if [ -f "$SHM_DIR/libSharedMemoryVideoBuffers.so" ]; then
+        cp "$SHM_DIR/libSharedMemoryVideoBuffers.so" "$SHM_DIR/src/python/"
+    fi
+fi
+
+if [ -f "$SHM_SO" ]; then
+    echo "  ✓ libSharedMemoryVideoBuffers.so present"
+    # Patch configuration.json to point at the correct lib_dir (only if still default)
+    SHM_LIB_DIR="$SHM_DIR/src/python"
+    CONFIG_FILE="$ROOT/configuration.json"
+    if grep -q '"lib_dir":.*""' "$CONFIG_FILE" 2>/dev/null; then
+        python3 - <<PYEOF
+import json, os
+cfg_path = "$CONFIG_FILE"
+with open(cfg_path) as f:
+    cfg = json.load(f)
+cfg.setdefault("shared_memory", {})["lib_dir"] = "$SHM_LIB_DIR"
+with open(cfg_path, "w") as f:
+    json.dump(cfg, f, indent=4)
+print("  Updated shared_memory.lib_dir in configuration.json")
+PYEOF
+    fi
+else
+    echo "  ⚠ Build failed — set shared_memory.lib_dir manually in configuration.json"
 fi
 
 # ── Done ──────────────────────────────────────────────────────────────────────
