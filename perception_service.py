@@ -416,11 +416,12 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
 
     Priority (highest first): CLI flag → configuration.json → built-in default.
     """
-    vlm  = cfg.get("vlm",        {})
-    vis  = cfg.get("vision",     {})
-    mic  = cfg.get("microphone", {})
-    ym   = cfg.get("ymapnet",    {})
-    out  = cfg.get("output",     {})
+    vlm  = cfg.get("vlm",           {})
+    vis  = cfg.get("vision",        {})
+    mic  = cfg.get("microphone",    {})
+    ym   = cfg.get("ymapnet",       {})
+    out  = cfg.get("output",        {})
+    shm  = cfg.get("shared_memory", {})
 
     p = argparse.ArgumentParser(
         description=__doc__,

@@ -71,8 +71,23 @@ class SHMProducer:
                  width: int, height: int, channels: int = 3):
         _check_lib(lib_dir)
         _ensure_path(lib_dir)
-        from SharedMemoryManager import SharedMemoryManager  # noqa: PLC0415
 
+        # SharedMemoryManager.server() calls connectToSharedMemoryContextDescriptor
+        # which uses shm_open(O_RDWR) — it requires the POSIX SHM object to already
+        # exist.  We must call createSharedMemoryContextDescriptor first so that
+        # shm_open(O_CREAT|O_RDWR) creates (or reopens) the object in /dev/shm/.
+        import ctypes
+        lib = ctypes.CDLL(_lib_path(lib_dir), mode=ctypes.RTLD_GLOBAL)
+        lib.createSharedMemoryContextDescriptor.argtypes = [ctypes.c_char_p]
+        lib.createSharedMemoryContextDescriptor.restype  = ctypes.c_int
+        rc = lib.createSharedMemoryContextDescriptor(descriptor.encode())
+        if rc == -1:
+            raise RuntimeError(
+                f"createSharedMemoryContextDescriptor failed for '{descriptor}'. "
+                f"Check /dev/shm/ permissions."
+            )
+
+        from SharedMemoryManager import SharedMemoryManager  # noqa: PLC0415
         self._smm = _quiet(
             SharedMemoryManager,
             _lib_path(lib_dir),
