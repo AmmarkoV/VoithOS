@@ -514,7 +514,7 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
                    "Briefly and concisely describe what you see in this image."),
                    help="Prompt sent to the VLM")
     p.add_argument("--vision-interval", type=int,
-                   default=vis.get("interval_sec", 30), metavar="SEC",
+                   default=vis.get("interval_sec", 60), metavar="SEC",
                    help="Seconds between VLM scene queries")
     p.add_argument("--vision-eco", type=float,
                    default=vis.get("eco", 0.0), metavar="THRESHOLD",
