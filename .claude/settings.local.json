@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./talk*.sh)",
+      "Bash(./talk*)",
+      "Bash(./snapshot.sh*)"
+    ]
+  }
+}

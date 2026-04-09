@@ -18,7 +18,7 @@ fi
 if [[ "$1" == "-" ]]; then
   PROMPT=$(cat)
 else
-  PROMPT="$*"
+  PROMPT="@\"voithos (agent)\" $*"
 fi
  
 tmux send-keys -t "$SESSION" "$PROMPT" Enter
