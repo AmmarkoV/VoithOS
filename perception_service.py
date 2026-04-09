@@ -266,30 +266,27 @@ def command_loop(config_path: str, poll_interval: float, stop: threading.Event) 
     last_command = ""
 
     while not stop.is_set():
-        stop.wait(poll_interval)
-        if stop.is_set():
-            break
-
         try:
             with open(config_path, encoding="utf-8") as f:
                 cfg = json.load(f)
         except Exception:
+            stop.wait(poll_interval)
             continue
 
         command = cfg.get("command", "").strip()
-        if not command or command == last_command:
-            continue
+        if command and command != last_command:
+            last_command = command
+            print(f"[command] Running: {command!r}")
+            try:
+                subprocess.Popen(
+                    [cmd_script, command],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+            except Exception as e:
+                print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
 
-        last_command = command
-        print(f"[command] Running: {command!r}")
-        try:
-            subprocess.Popen(
-                [cmd_script, command],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-        except Exception as e:
-            print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
+        stop.wait(poll_interval)
 
 
 # ── Camera server subprocess ──────────────────────────────────────────────────
