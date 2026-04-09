@@ -251,7 +251,7 @@ def mic_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> None:
                         )
                         append_log(log_path, {"type": "speech", "ts": now, "text": text})
                         print(f"[mic]    {now}  {text}")
-                        if args.command_mic and len(text.split()) > 3:
+                        if args.command_mic and len(text.split()) > args.command_mic_words:
                             _fire_command(f"<microphone>{text}</microphone>")
 
     except Exception as e:
@@ -570,7 +570,10 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
                    help="Seconds between configuration.json polls for a new command (default: 5)")
     p.add_argument("--command-mic", action="store_true",
                    default=bool(cfg.get("command_mic", False)),
-                   help="Forward mic utterances >3 words to command.sh wrapped in <microphone> tags")
+                   help="Forward mic utterances to command.sh wrapped in <microphone> tags")
+    p.add_argument("--command-mic-words", type=int,
+                   default=cfg.get("command_mic_words", 3), metavar="N",
+                   help="Minimum word count to trigger command_mic (default: 3)")
     p.add_argument("--command-vlm", action="store_true",
                    default=bool(cfg.get("command_vlm", False)),
                    help="Forward VLM descriptions to command.sh wrapped in <vision> tags")

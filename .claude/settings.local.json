@@ -4,7 +4,8 @@
       "Bash(./talk*.sh)",
       "Bash(./talk*)",
       "Bash(./snapshot.sh*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(/home/ammar/Documents/Programming/VoithOS/talk.sh)"
     ]
   }
 }
