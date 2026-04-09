@@ -418,6 +418,7 @@ class YMAPNetSensor:
                "--eco",          str(self.args.ymapnet_eco),
                "--interval",     str(self.args.ymapnet_interval),
                "--threshold",    str(self.args.ymapnet_threshold),
+               "--vram-limit",   str(self.args.ymapnet_vram_limit),
                "--lib-dir",      self.args.lib_dir,
                "--descriptor",   self.args.shm_descriptor,
                "--stream",       self.args.shm_stream,
@@ -555,6 +556,8 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
                    metavar=("W", "H"), help="Camera resolution")
     p.add_argument("--cpu", action="store_true", default=bool(ym.get("cpu", False)),
                    help="Force CPU inference for YMAPNet")
+    p.add_argument("--ymapnet-vram-limit", type=int, default=ym.get("vram_limit", 4800),
+                   metavar="MB", help="GPU VRAM limit in MB for YMAPNet (default: 4800)")
     # Shared memory camera bus
     p.add_argument("--lib-dir",      default=shm.get("lib_dir", ""),
                    help="Path to SharedMemoryVideoBuffers/src/python/")

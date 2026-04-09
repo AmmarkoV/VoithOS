@@ -161,6 +161,8 @@ def parse_args():
     p.add_argument("--eco",         type=float, default=ym.get("eco", 5.0),
                    help="Skip inference when mean pixel diff < ECO")
     p.add_argument("--cpu",         action="store_true", default=bool(ym.get("cpu", False)))
+    p.add_argument("--vram-limit",  type=int, default=ym.get("vram_limit", 4800),
+                   help="GPU VRAM limit in MB passed to NNExecutor (default: 4800)")
     # Shared memory
     p.add_argument("--lib-dir",     default=shm.get("lib_dir", ""),
                    help="Path to SharedMemoryVideoBuffers/src/python/")
@@ -233,6 +235,7 @@ def main():
             depth_iterations=0,        # fast mode
             estimate_person_id=False,
             resolve_skeleton=False,
+            vram_limit=args.vram_limit,
         )
     finally:
         os.chdir(original_dir)
