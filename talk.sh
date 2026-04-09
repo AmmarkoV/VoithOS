@@ -1,5 +1,5 @@
 #!/bin/bash
-# talk.sh — speak text in English using Kokoro TTS.
+# talk.sh — translate English → Greek (via Argos) then speak with Kokoro.
 #
 # Usage:
 #   ./talk.sh "Hello, how are you?"
@@ -9,8 +9,4 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
-if [ -f venv/bin/activate ]; then
-    source venv/bin/activate
-fi
-
-exec python3 talk.py "$@" 1>/dev/null 2> /dev/null
+exec "$DIR/talkgreek.sh" "$@"
