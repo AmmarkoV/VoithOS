@@ -48,6 +48,7 @@ import time
 from datetime import datetime
 
 import cv2
+import numpy as np
 import sounddevice as sd
 from gradio_client import Client, handle_file
 from vosk import Model, KaldiRecognizer
