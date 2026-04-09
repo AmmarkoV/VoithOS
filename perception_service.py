@@ -54,6 +54,23 @@ from gradio_client import Client, handle_file
 from vosk import Model, KaldiRecognizer
 
 
+# ── Utilities ────────────────────────────────────────────────────────────────
+
+_SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+
+def _fire_command(text: str) -> None:
+    """Invoke ./command.sh with *text* as a single argument (non-blocking)."""
+    cmd_script = os.path.join(_SCRIPT_DIR, "command.sh")
+    try:
+        subprocess.Popen(
+            [cmd_script, text],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
+
+
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
 def ts() -> str:
@@ -184,6 +201,8 @@ def vision_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> Non
                 append_log(log_path, {"type": "vision", "ts": now, "description": desc})
                 print(f"[vision] {now}  {desc[:100]}")
                 last_frame = frame   # update reference only after a successful query
+                if args.command_vlm:
+                    _fire_command(f"<vision>{desc}</vision>")
             except Exception as e:
                 print(f"[vision] Query error: {e}", file=sys.stderr)
                 client = None
@@ -232,6 +251,8 @@ def mic_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> None:
                         )
                         append_log(log_path, {"type": "speech", "ts": now, "text": text})
                         print(f"[mic]    {now}  {text}")
+                        if args.command_mic and len(text.split()) > 3:
+                            _fire_command(f"<microphone>{text}</microphone>")
 
     except Exception as e:
         print(f"[mic] Fatal: {e}", file=sys.stderr)
@@ -261,8 +282,6 @@ def command_loop(config_path: str, poll_interval: float, stop: threading.Event) 
     Fires ./command.sh "COMMAND" once each time the value changes to something
     non-empty.  Never writes back to configuration.json.
     """
-    script_dir   = os.path.dirname(os.path.abspath(__file__))
-    cmd_script   = os.path.join(script_dir, "command.sh")
     last_command = ""
 
     while not stop.is_set():
@@ -277,14 +296,7 @@ def command_loop(config_path: str, poll_interval: float, stop: threading.Event) 
         if command and command != last_command:
             last_command = command
             print(f"[command] Running: {command!r}")
-            try:
-                subprocess.Popen(
-                    [cmd_script, command],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                )
-            except Exception as e:
-                print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
+            _fire_command(command)
 
         stop.wait(poll_interval)
 
@@ -556,6 +568,12 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
     # Command watcher
     p.add_argument("--command-heartbeat", type=float, default=cmd_hb, metavar="SEC",
                    help="Seconds between configuration.json polls for a new command (default: 5)")
+    p.add_argument("--command-mic", action="store_true",
+                   default=bool(cfg.get("command_mic", False)),
+                   help="Forward mic utterances >3 words to command.sh wrapped in <microphone> tags")
+    p.add_argument("--command-vlm", action="store_true",
+                   default=bool(cfg.get("command_vlm", False)),
+                   help="Forward VLM descriptions to command.sh wrapped in <vision> tags")
     return p
 
 
