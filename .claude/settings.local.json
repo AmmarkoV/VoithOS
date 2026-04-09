@@ -3,7 +3,8 @@
     "allow": [
       "Bash(./talk*.sh)",
       "Bash(./talk*)",
-      "Bash(./snapshot.sh*)"
+      "Bash(./snapshot.sh*)",
+      "Bash(bash:*)"
     ]
   }
 }

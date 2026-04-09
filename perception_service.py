@@ -83,7 +83,9 @@ def write_atomic(path: str, text: str) -> None:
         raise
 
 
-def append_log(log_path: str, entry: dict) -> None:
+def append_log(log_path: str | None, entry: dict) -> None:
+    if log_path is None:
+        return
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
@@ -124,11 +126,19 @@ def vlm_query(client: Client, frame_path: str, prompt: str,
 
 # ── Vision thread ─────────────────────────────────────────────────────────────
 
+def _frame_diff(a: np.ndarray, b: np.ndarray) -> float:
+    """Mean absolute pixel difference between two frames, compared at 256×256."""
+    sa = cv2.resize(a, (256, 256), interpolation=cv2.INTER_AREA).astype(np.float32)
+    sb = cv2.resize(b, (256, 256), interpolation=cv2.INTER_AREA).astype(np.float32)
+    return float(np.mean(np.abs(sa - sb)))
+
+
 def vision_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> None:
     from shm_camera import SHMConsumer
 
-    consumer = SHMConsumer(args.lib_dir, args.shm_descriptor, args.shm_stream)
-    client   = None  # lazy VLM connect
+    consumer   = SHMConsumer(args.lib_dir, args.shm_descriptor, args.shm_stream)
+    client     = None   # lazy VLM connect
+    last_frame: np.ndarray | None = None  # frame used in the last successful VLM query
 
     with tempfile.TemporaryDirectory(prefix="perception_") as tmpdir:
         frame_path = os.path.join(tmpdir, "frame.jpg")
@@ -138,6 +148,13 @@ def vision_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> Non
             if frame is None:
                 stop.wait(1)
                 continue
+
+            # ── eco: skip VLM if scene hasn't changed enough since last query ──
+            if args.vision_eco > 0 and last_frame is not None:
+                diff = _frame_diff(frame, last_frame)
+                if diff < args.vision_eco:
+                    stop.wait(args.vision_interval)
+                    continue
 
             # Lazily connect / reconnect to VLM
             if client is None:
@@ -165,6 +182,7 @@ def vision_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> Non
                 )
                 append_log(log_path, {"type": "vision", "ts": now, "description": desc})
                 print(f"[vision] {now}  {desc[:100]}")
+                last_frame = frame   # update reference only after a successful query
             except Exception as e:
                 print(f"[vision] Query error: {e}", file=sys.stderr)
                 client = None
@@ -232,6 +250,54 @@ def heartbeat_loop(args, out_dir: str, stop: threading.Event) -> None:
         }
         write_atomic(path, json.dumps(payload, indent=2) + "\n")
         stop.wait(30)
+
+
+# ── Command loop ─────────────────────────────────────────────────────────────
+
+def command_loop(config_path: str, poll_interval: float, stop: threading.Event) -> None:
+    """Poll configuration.json for a non-empty 'command' field.
+
+    When found, invoke ./command.sh "COMMAND" as a background subprocess, then
+    clear the field so the command fires exactly once per write.
+    """
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    cmd_script = os.path.join(script_dir, "command.sh")
+
+    while not stop.is_set():
+        stop.wait(poll_interval)
+        if stop.is_set():
+            break
+
+        try:
+            with open(config_path, encoding="utf-8") as f:
+                cfg = json.load(f)
+        except Exception:
+            continue
+
+        command = cfg.get("command", "").strip()
+        if not command:
+            continue
+
+        print(f"[command] Running: {command!r}")
+        try:
+            subprocess.Popen(
+                [cmd_script, command],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
+
+        # Clear the field so the same command doesn't re-run next poll
+        cfg["command"] = ""
+        try:
+            fd, tmp = tempfile.mkstemp(dir=script_dir, suffix=".json")
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                json.dump(cfg, f, indent=4, ensure_ascii=False)
+                f.write("\n")
+            os.replace(tmp, config_path)
+        except Exception as e:
+            print(f"[command] Could not clear command in config: {e}", file=sys.stderr)
 
 
 # ── Camera server subprocess ──────────────────────────────────────────────────
@@ -421,7 +487,9 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
     mic  = cfg.get("microphone",    {})
     ym   = cfg.get("ymapnet",       {})
     out  = cfg.get("output",        {})
+
     shm  = cfg.get("shared_memory", {})
+    cmd_hb = cfg.get("command_heartbeat", 5)
 
     p = argparse.ArgumentParser(
         description=__doc__,
@@ -432,6 +500,9 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
     # Output
     p.add_argument("--out-dir", default=out.get("dir", "context"),
                    help="Directory for output files")
+    p.add_argument("--log", action="store_true",
+                   default=bool(out.get("log", False)),
+                   help="Enable append-only log.jsonl (disabled by default)")
     # VLM
     p.add_argument("--ip",     default=vlm.get("ip",   "127.0.0.1"), help="VLM server host")
     p.add_argument("--port",   default=str(vlm.get("port", "8080")), help="VLM server port")
@@ -441,6 +512,10 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
     p.add_argument("--vision-interval", type=int,
                    default=vis.get("interval_sec", 30), metavar="SEC",
                    help="Seconds between VLM scene queries")
+    p.add_argument("--vision-eco", type=float,
+                   default=vis.get("eco", 0.0), metavar="THRESHOLD",
+                   help="Skip VLM query when mean pixel diff vs last query is below "
+                        "THRESHOLD (0 = always query, try 5–15 for static scenes)")
     p.add_argument("--no-vlm", action="store_true",
                    help="Disable VLM vision queries entirely")
     p.add_argument("--greek", action="store_true", default=bool(vlm.get("greek", False)),
@@ -484,6 +559,9 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
                    help="Path to SharedMemoryVideoBuffers/src/python/")
     p.add_argument("--shm-descriptor", default=shm.get("descriptor", "voithos_video.shm"))
     p.add_argument("--shm-stream",     default=shm.get("stream_name", "voithos_cam"))
+    # Command watcher
+    p.add_argument("--command-heartbeat", type=float, default=cmd_hb, metavar="SEC",
+                   help="Seconds between configuration.json polls for a new command (default: 5)")
     return p
 
 
@@ -514,14 +592,23 @@ def main() -> None:
         sys.exit(1)
 
     os.makedirs(args.out_dir, exist_ok=True)
-    log_path = os.path.join(args.out_dir, "log.jsonl")
+    log_path = os.path.join(args.out_dir, "log.jsonl") if args.log else None
+
+    # Create context/ → out_dir symlink in the project root for convenience
+    project_root = os.path.dirname(os.path.abspath(__file__))
+    link_path    = os.path.join(project_root, "context")
+    target       = os.path.abspath(args.out_dir)
+    if not os.path.exists(link_path) and not os.path.islink(link_path):
+        os.symlink(target, link_path)
+        print(f"[service] Created symlink: context/ → {target}")
 
     print(f"[service] Perception service starting")
     print(f"[service] Output directory: {os.path.abspath(args.out_dir)}")
     if need_camera:
         print(f"[service] Camera bus: SHM '{args.shm_stream}'  ({args.shm_descriptor})")
     if not args.no_vlm:
-        print(f"[service] VLM: {args.ip}:{args.port}  interval={args.vision_interval}s")
+        eco_str = f"  eco={args.vision_eco}" if args.vision_eco > 0 else ""
+        print(f"[service] VLM: {args.ip}:{args.port}  interval={args.vision_interval}s{eco_str}")
     if not args.no_mic:
         print(f"[service] Mic: lang={args.mic_lang}")
     if not args.no_ymapnet:
@@ -560,6 +647,12 @@ def main() -> None:
                           daemon=True, name="heartbeat")
     threads.append(hb)
     hb.start()
+
+    # Command watcher
+    cmd_t = threading.Thread(target=command_loop, args=(pre_args.config, args.command_heartbeat, stop),
+                             daemon=True, name="command")
+    threads.append(cmd_t)
+    cmd_t.start()
 
     print("[service] Running — Ctrl-C to stop")
     try:
