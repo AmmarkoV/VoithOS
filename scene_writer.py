@@ -80,7 +80,9 @@ def write_atomic(path: str, text: str) -> None:
         raise
 
 
-def append_log(log_path: str, entry: dict) -> None:
+def append_log(log_path: str | None, entry: dict) -> None:
+    if log_path is None:
+        return
     with open(log_path, "a", encoding="utf-8") as f:
         f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
@@ -161,6 +163,8 @@ def parse_args():
     p.add_argument("--eco",         type=float, default=ym.get("eco", 5.0),
                    help="Skip inference when mean pixel diff < ECO")
     p.add_argument("--cpu",         action="store_true", default=bool(ym.get("cpu", False)))
+    p.add_argument("--log",         action="store_true", default=bool(out.get("log", False)),
+                   help="Enable append-only log.jsonl (disabled by default)")
     p.add_argument("--vram-limit",  type=int, default=ym.get("vram_limit", 4800),
                    help="GPU VRAM limit in MB passed to NNExecutor (default: 4800)")
     # Shared memory
@@ -191,7 +195,7 @@ def main():
         sys.exit(1)
 
     os.makedirs(args.out_dir, exist_ok=True)
-    log_path   = os.path.join(args.out_dir, "log.jsonl")
+    log_path   = os.path.join(args.out_dir, "log.jsonl") if args.log else None
     scene_path = os.path.join(args.out_dir, "scene_latest.json")
 
     # ── connect to shared memory camera ──────────────────────────────────────

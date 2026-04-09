@@ -258,11 +258,12 @@ def heartbeat_loop(args, out_dir: str, stop: threading.Event) -> None:
 def command_loop(config_path: str, poll_interval: float, stop: threading.Event) -> None:
     """Poll configuration.json for a non-empty 'command' field.
 
-    When found, invoke ./command.sh "COMMAND" as a background subprocess, then
-    clear the field so the command fires exactly once per write.
+    Fires ./command.sh "COMMAND" once each time the value changes to something
+    non-empty.  Never writes back to configuration.json.
     """
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    cmd_script = os.path.join(script_dir, "command.sh")
+    script_dir   = os.path.dirname(os.path.abspath(__file__))
+    cmd_script   = os.path.join(script_dir, "command.sh")
+    last_command = ""
 
     while not stop.is_set():
         stop.wait(poll_interval)
@@ -276,9 +277,10 @@ def command_loop(config_path: str, poll_interval: float, stop: threading.Event) 
             continue
 
         command = cfg.get("command", "").strip()
-        if not command:
+        if not command or command == last_command:
             continue
 
+        last_command = command
         print(f"[command] Running: {command!r}")
         try:
             subprocess.Popen(
@@ -288,17 +290,6 @@ def command_loop(config_path: str, poll_interval: float, stop: threading.Event) 
             )
         except Exception as e:
             print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
-
-        # Clear the field so the same command doesn't re-run next poll
-        cfg["command"] = ""
-        try:
-            fd, tmp = tempfile.mkstemp(dir=script_dir, suffix=".json")
-            with os.fdopen(fd, "w", encoding="utf-8") as f:
-                json.dump(cfg, f, indent=4, ensure_ascii=False)
-                f.write("\n")
-            os.replace(tmp, config_path)
-        except Exception as e:
-            print(f"[command] Could not clear command in config: {e}", file=sys.stderr)
 
 
 # ── Camera server subprocess ──────────────────────────────────────────────────
@@ -425,6 +416,8 @@ class YMAPNetSensor:
                ]
         if self.args.cpu:
             cmd.append("--cpu")
+        if self.args.log:
+            cmd.append("--log")
         return cmd
 
     def _supervise(self) -> None:
