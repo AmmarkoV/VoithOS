@@ -58,9 +58,10 @@ from vosk import Model, KaldiRecognizer
 
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 
-def _fire_command(text: str) -> None:
-    """Invoke ./command.sh with *text* as a single argument (non-blocking)."""
-    cmd_script = os.path.join(_SCRIPT_DIR, "command.sh")
+def _fire_command(text: str, cmd_script: str = "command.sh") -> None:
+    """Invoke cmd_script with *text* as a single argument (non-blocking)."""
+    if not os.path.isabs(cmd_script):
+        cmd_script = os.path.join(_SCRIPT_DIR, cmd_script)
     try:
         subprocess.Popen(
             [cmd_script, text],
@@ -68,7 +69,7 @@ def _fire_command(text: str) -> None:
             stderr=subprocess.DEVNULL,
         )
     except Exception as e:
-        print(f"[command] Failed to launch command.sh: {e}", file=sys.stderr)
+        print(f"[command] Failed to launch {cmd_script}: {e}", file=sys.stderr)
 
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
@@ -202,7 +203,7 @@ def vision_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> Non
                 print(f"[vision] {now}  {desc[:100]}")
                 last_frame = frame   # update reference only after a successful query
                 if args.command_vlm:
-                    _fire_command(f"<vision>{desc}</vision>")
+                    _fire_command(f"<vision>{desc}</vision>", args.command_script)
             except Exception as e:
                 print(f"[vision] Query error: {e}", file=sys.stderr)
                 client = None
@@ -252,7 +253,7 @@ def mic_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> None:
                         append_log(log_path, {"type": "speech", "ts": now, "text": text})
                         print(f"[mic]    {now}  {text}")
                         if args.command_mic and len(text.split()) > args.command_mic_words:
-                            _fire_command(f"<microphone>{text}</microphone>")
+                            _fire_command(f"<microphone>{text}</microphone>", args.command_script)
 
     except Exception as e:
         print(f"[mic] Fatal: {e}", file=sys.stderr)
@@ -279,8 +280,8 @@ def heartbeat_loop(args, out_dir: str, stop: threading.Event) -> None:
 def command_loop(config_path: str, poll_interval: float, stop: threading.Event) -> None:
     """Poll configuration.json for a non-empty 'command' field.
 
-    Fires ./command.sh "COMMAND" once each time the value changes to something
-    non-empty.  Never writes back to configuration.json.
+    Fires the script named in 'command_script' with 'command' as its argument,
+    once each time the value changes to something non-empty.
     """
     last_command = ""
 
@@ -292,11 +293,12 @@ def command_loop(config_path: str, poll_interval: float, stop: threading.Event) 
             stop.wait(poll_interval)
             continue
 
-        command = cfg.get("command", "").strip()
+        command        = cfg.get("command",        "").strip()
+        command_script = cfg.get("command_script", "command.sh").strip()
         if command and command != last_command:
             last_command = command
             print(f"[command] Running: {command!r}")
-            _fire_command(command)
+            _fire_command(command, command_script)
 
         stop.wait(poll_interval)
 
@@ -568,6 +570,8 @@ def build_parser(cfg: dict) -> argparse.ArgumentParser:
     # Command watcher
     p.add_argument("--command-heartbeat", type=float, default=cmd_hb, metavar="SEC",
                    help="Seconds between configuration.json polls for a new command (default: 5)")
+    p.add_argument("--command-script", default=cfg.get("command_script", "./command.sh"),
+                   help="Script to invoke when relaying commands (default: ./command.sh)")
     p.add_argument("--command-mic", action="store_true",
                    default=bool(cfg.get("command_mic", False)),
                    help="Forward mic utterances to command.sh wrapped in <microphone> tags")

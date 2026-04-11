@@ -1,0 +1,46 @@
+{
+    "vlm": {
+        "ip":          "127.0.0.1",
+        "port":        8083,
+        "prompt":      "Briefly and concisely describe what you see in this image.",
+        "temperature": 0.6,
+        "top_p":       0.9,
+        "max_tokens":  120,
+        "greek":       false
+    },
+    "vision": {
+        "camera":       0,
+        "interval_sec": 60,
+        "eco":          0.0
+    },
+    "microphone": {
+        "language":   "el",
+        "device":     null,
+        "samplerate": null
+    },
+    "ymapnet": {
+        "enabled":      true,
+        "dir":          "./Y-MAP-Net",
+        "interval_sec": 2.0,
+        "eco":          5.0,
+        "threshold":    84.0,
+        "size":         [640, 480],
+        "cpu":          false,
+        "vram_limit":   4800
+    },
+    "output": {
+        "dir": "context",
+        "log": false
+    },
+    "shared_memory": {
+        "lib_dir":     "/home/ammar/Documents/Programming/VoithOS/SharedMemoryVideoBuffers",
+        "descriptor":  "voithos_video.shm",
+        "stream_name": "voithos_cam"
+    },
+    "command_heartbeat": 5,
+    "command_script":    "./command.sh",
+    "command_mic":       "./command.sh",
+    "command_mic_words": 3,
+    "command_vlm":       "./command.sh",
+    "command":           ""
+}
