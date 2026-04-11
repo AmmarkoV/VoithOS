@@ -9,4 +9,17 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$DIR"
 
-exec "$DIR/talkgreek.sh" "$@"
+if [ -t 0 ]; then
+    # stdin is a terminal, use command-line arguments only
+    exec "$DIR/talkgreek.sh" "$@"
+else
+    # stdin has input, combine with command-line arguments
+    stdin_input=$(cat)
+    if [ -n "$stdin_input" ] && [ -n "$*" ]; then
+        exec "$DIR/talkgreek.sh" "$stdin_input" "$@"
+    elif [ -n "$stdin_input" ]; then
+        exec "$DIR/talkgreek.sh" "$stdin_input"
+    else
+        exec "$DIR/talkgreek.sh" "$@"
+    fi
+fi
