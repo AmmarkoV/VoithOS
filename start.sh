@@ -17,3 +17,6 @@ echo "Started myclaude in tmux session '$SESSION' at $WORKDIR"
 echo "  Attach : tmux attach -t $SESSION"
 echo "  Send   : ./claude_send.sh 'your prompt'"
  
+
+tmux attach -t myclaude
+
