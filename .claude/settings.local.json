@@ -9,9 +9,11 @@
       "Bash(/home/ammar/Documents/Programming/VoithOS/./talk.sh)",
       "Bash(/home/ammar/Documents/Programming/VoithOS/vqa.sh)",
       "Bash(/home/ammar/Documents/Programming/VoithOS/./vqa.sh)",
+      "Bash(./vqa.sh)",
       "Bash(./talk.sh)",
       "Read(context/*)",
-      "Bash(/compact:*)"
+      "Bash(/compact:*)",
+      "Bash(ls -la /home/ammar/Documents/Programming/VoithOS/*.sh)"
     ]
   }
 }
