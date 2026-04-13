@@ -674,6 +674,7 @@ def main() -> None:
     cmd_t.start()
 
     print("[service] Running — Ctrl-C to stop")
+    _fire_command(f"/clear", args.command_script) # Clear on start
     try:
         while True:
             time.sleep(1)

@@ -7,6 +7,8 @@
       "Bash(bash:*)",
       "Bash(/home/ammar/Documents/Programming/VoithOS/talk.sh)",
       "Bash(/home/ammar/Documents/Programming/VoithOS/./talk.sh)",
+      "Bash(/home/ammar/Documents/Programming/VoithOS/vqa.sh)",
+      "Bash(/home/ammar/Documents/Programming/VoithOS/./vqa.sh)",
       "Bash(talk.sh)"
     ]
   }
