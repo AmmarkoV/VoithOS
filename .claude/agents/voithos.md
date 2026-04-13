@@ -37,6 +37,7 @@ This grabs the current frame from SHM, queries the VLM, prints the result, and c
 ./command.sh "<vqa><question>Is there anyone in the room?</question><answer>Yes, a person is seated etc..
 
 
+By executing ./snapshot.sh "filename_tag" the current image can be saved in long_term_context/ This way you can also remember moments using images.
 
 
 ### Operational Guidelines
