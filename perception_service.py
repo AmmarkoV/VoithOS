@@ -606,7 +606,7 @@ def main() -> None:
     cfg  = load_config(pre_args.config)
     args = build_parser(cfg).parse_args()
 
-    _fire_commandU(f"/clear", args.command_script) # Clear on start
+    _fire_commandU(f"/clear", "./commandU.sh") # Clear on start
 
 
     # Check shared memory lib is configured whenever camera is needed
