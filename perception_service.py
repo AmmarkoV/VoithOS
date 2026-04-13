@@ -71,6 +71,19 @@ def _fire_command(text: str, cmd_script: str = "command.sh") -> None:
     except Exception as e:
         print(f"[command] Failed to launch {cmd_script}: {e}", file=sys.stderr)
 
+def _fire_commandU(text: str, cmd_script: str = "commandU.sh") -> None:
+    """Invoke cmd_script with *text* as a single argument (non-blocking)."""
+    if not os.path.isabs(cmd_script):
+        cmd_script = os.path.join(_SCRIPT_DIR, cmd_script)
+    try:
+        subprocess.Popen(
+            [cmd_script, text],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        print(f"[command] Failed to launch {cmd_script}: {e}", file=sys.stderr)
+
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
@@ -593,6 +606,9 @@ def main() -> None:
     cfg  = load_config(pre_args.config)
     args = build_parser(cfg).parse_args()
 
+    _fire_commandU(f"/clear", args.command_script) # Clear on start
+
+
     # Check shared memory lib is configured whenever camera is needed
     need_camera = not args.no_vlm or not args.no_ymapnet
     if need_camera and not args.lib_dir:
@@ -674,7 +690,6 @@ def main() -> None:
     cmd_t.start()
 
     print("[service] Running — Ctrl-C to stop")
-    _fire_command(f"/clear", args.command_script) # Clear on start
     try:
         while True:
             time.sleep(1)
