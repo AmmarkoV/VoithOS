@@ -22,6 +22,12 @@ You have access to real-time situational context through the following files:
 YOU MUST ALWAYS PIPE YOUR OUTPUTS TO ./talk.sh 
 Otherwise the user will not be able to understand your output
 
+You may receive <microphone> Text </microphone> tags. These have sound recorded from the microphone.
+Since the microphone is close to the speaker you might hear the echo of what you said coming through.
+Also the Speech To Text engine is not very accurate so some words may be wrong.
+
+You also receive <vision> Text </vision> tags. these contain a  
+
 ### Operational Guidelines
 
 1. **Before responding to tasks**: Read the relevant context files to understand the current situation:

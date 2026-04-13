@@ -7,8 +7,12 @@ Usage:
     python3 talkgreek.py Hello world          # multiple args are joined
     echo "Hello" | python3 talkgreek.py       # text from stdin
     python3 talkgreek.py --greek "Γεια σου"   # skip translation, speak as-is
+    python3 talkgreek.py --list-devices       # print available audio devices
 """
 
+import argparse
+import json
+import os
 import sys
 import numpy as np
 import sounddevice as sd
@@ -17,6 +21,16 @@ from kokoro import KPipeline
 VOICE      = "ef_dora"
 LANG_CODE  = "e"          # 'e' = Greek (espeak el)
 SAMPLERATE = 24000
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "configuration.json")
+
+
+def _load_config() -> dict:
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
 
 def translate_to_greek(text: str) -> str:
     from argostranslate import translate
@@ -29,38 +43,53 @@ def translate_to_greek(text: str) -> str:
         sys.exit(1)
     return en.get_translation(el).translate(text)
 
-def speak(text: str, pipeline: KPipeline) -> None:
+
+def speak(text: str, pipeline: KPipeline, device) -> None:
     for _, _, audio in pipeline(text, voice=VOICE, speed=1, split_pattern=r'\n+'):
         if isinstance(audio, (list, tuple)):
             audio = np.array(audio, dtype=np.float32)
-        sd.play(audio, samplerate=SAMPLERATE)
+        sd.play(audio, samplerate=SAMPLERATE, device=device)
         sd.wait()
 
+
 def main() -> None:
-    skip_translation = False
-    argv = sys.argv[1:]
+    cfg = _load_config()
 
-    if argv and argv[0] == "--greek":
-        skip_translation = True
-        argv = argv[1:]
+    # sound_device may be a name (str) or index (int)
+    raw_dev = cfg.get("sound_device", None)
+    try:
+        default_device = int(raw_dev) if raw_dev is not None else None
+    except (TypeError, ValueError):
+        default_device = raw_dev  # keep as string for name-based lookup
 
-    if argv:
-        text = " ".join(argv)
-    else:
-        text = sys.stdin.read()
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("text", nargs="*", help="Text to speak (or read from stdin)")
+    parser.add_argument("--greek", action="store_true",
+                        help="Skip translation; treat input as Greek text")
+    parser.add_argument("-d", "--device", default=default_device,
+                        help="Output audio device name or index (default: from configuration.json)")
+    parser.add_argument("--list-devices", action="store_true",
+                        help="Print available audio devices and exit")
+    args = parser.parse_args()
 
+    if args.list_devices:
+        print(sd.query_devices())
+        sys.exit(0)
+
+    text = " ".join(args.text) if args.text else sys.stdin.read()
     text = text.strip()
     if not text:
-        print("talkgreek.py: no text provided", file=sys.stderr)
-        sys.exit(1)
+        sys.exit(0)
 
-    if not skip_translation:
+    if not args.greek:
         print(f"[translate] {text}", flush=True)
         text = translate_to_greek(text)
         print(f"[greek]     {text}", flush=True)
 
     pipeline = KPipeline(lang_code=LANG_CODE)
-    speak(text, pipeline)
+    speak(text, pipeline, args.device)
+
 
 if __name__ == "__main__":
     main()
