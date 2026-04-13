@@ -185,6 +185,8 @@ def vision_loop(args, out_dir: str, log_path: str, stop: threading.Event) -> Non
             if args.vision_eco > 0 and last_frame is not None:
                 diff = _frame_diff(frame, last_frame)
                 if diff < args.vision_eco:
+                    if args.command_vlm:
+                        _fire_command("<inactivity/>")
                     stop.wait(args.vision_interval)
                     continue
 
